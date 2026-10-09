@@ -3,13 +3,14 @@ import { useCallback, useSyncExternalStore } from 'react';
 /**
  * Subscribe to a CSS media query from React.
  *
- * Used to switch a section's *layout* rather than just its styling. The Process
- * section is the reason this exists: its pinned stack is driven by GSAP, and the
- * reduced-motion fallback is a structurally different grid — different element
- * wrappers, different containments, different entrance attributes. A CSS-only
- * version would have to animate a layout that must also work unanimated.
- * Deciding in React means the fallback is a real layout rather than an
- * animation switched off.
+ * For decisions that genuinely have to be made in React rather than in CSS: a
+ * different component, a different event handler, a GSAP scene that should not
+ * be built at all. `TiltCard` is the current caller — its tilt is a JS pointer
+ * handler driving a GSAP tween, so "is this a fine pointer, and has the visitor
+ * asked for less motion" is a question CSS cannot answer on its behalf.
+ *
+ * Anything that only changes how something *looks* belongs in a Tailwind
+ * variant, not here.
  *
  * @param {string} query - e.g. '(min-width: 1024px)'
  * @returns {boolean} whether the query currently matches

@@ -96,11 +96,20 @@ If you find yourself reaching for amber twice on one screen, you are decorating.
 
 | Class | Definition | Use |
 | --- | --- | --- |
-| `bg-brand-gradient` | `135deg`, `primary-600 → primary-800 → primary-950` | Dark bands: "How it works", final CTA |
+| `bg-brand-gradient` | `135deg`, `primary-600 → primary-800 → primary-950` | The final-CTA panel, and the one dark bento tile in WhyUs |
 | `bg-brand-soft` | `180deg`, `#f6f4ff → #ffffff` | Hero background |
 | `text-gradient-brand` | Purple text clip | One emphasised phrase per headline |
-| `bg-grid` | 56px purple grid lines | Texture behind hero and dark bands |
+| `bg-grid` | 56px purple grid lines | Texture behind the hero — see the note below |
 | `mask-fade-b` / `mask-fade-x` | Gradient masks | Dissolve grid and marquee edges |
+
+**Where `bg-grid` may go:** the hero (`opacity-70`, masked), the two dark gradient
+surfaces (`WhyUs`'s featured tile, the `FinalCta` panel, both at `opacity-30`),
+and — at `opacity-25` — over a `Courses` card image, where it is a legibility
+scrim rather than texture. Its one removal was the Process band: over a stack of
+cards the band shows mostly in the gaps, and a grid in the gaps reads as noise.
+The rule is that a grid needs either a large uninterrupted surface or a dark
+ground to be worth its weight. On a flat light band with content over it, it is
+neither.
 
 ---
 
@@ -295,7 +304,7 @@ two systems was a hazard before it was ever a weight problem.
 
 | Trigger | Tool |
 | --- | --- |
-| Scroll position | GSAP + ScrollTrigger — every section entrance, word-by-word headings, the Process stack, the nav scroll-spy, the reading-progress bar |
+| Scroll position | GSAP + ScrollTrigger — every section entrance, word-by-word headings, the nav scroll-spy, the reading-progress bar |
 | Pointer | GSAP — `TiltCard` (`gsap.quickTo`), the hero's floating chips |
 | User action | GSAP — the FAQ accordion, a height tween |
 
@@ -336,13 +345,13 @@ what is**, and re-measures only when that changed something:
 | What changed | Why it needs a pass |
 | --- | --- |
 | Courses' cards arrive from react-query after mount | A child was added |
-| `Process` switches between the grid and the pinned stack | Its steps gain or lose `data-reveal` — an *attribute* change, not a child change |
+| Courses refetches and replaces a batch | Children were added *and* removed — `prune()` is what stops the replaced ones holding a tween and a trigger for the life of the page |
+| Some element gains or loses `data-reveal` in place | An *attribute* change, not a child change, so the child-list half of the observer would never see it. Nothing does this today; the `attributeFilter` is cheap insurance, and it is what makes `prune()`'s `matches` check reachable |
 
-That second one is the reason the observer watches attributes as well as child
-lists, and the reason un-claiming matters as much as claiming: a killed entrance
-tween leaves behind whatever it last wrote, so without clearing the element's
-props, un-marking a card that never entered the viewport would hide it
-permanently rather than reveal it.
+Un-claiming matters as much as claiming: a killed entrance tween leaves behind
+whatever it last wrote, so without clearing the element's props, un-marking a
+card that never entered the viewport would hide it permanently rather than reveal
+it.
 
 Claims are held in `Map`s in the effect's own scope, never as a
 `data-scene-ready` attribute on the element. Under `<StrictMode>` the effect runs
@@ -388,16 +397,17 @@ gsap.matchMedia().add(`(min-width: 1024px) and ${MOTION_OK}`, () => {
 });
 ```
 
-`MOTION_OK` is exported from `utils/gsap.js`. Getting this wrong ships a pinned,
-scrubbing section to someone who asked for no motion — the worst failure mode on
-this page.
+`MOTION_OK` is exported from `utils/gsap.js`. Getting this wrong ships a
+scroll-driven scene to someone who asked for no motion — the worst failure mode
+on this page.
 
 Not every gate is a `matchMedia` gate, because not every animation should be
 *removed* under reduced motion:
 
 | Scene | Gate |
 | --- | --- |
-| Section entrances, hero chips, Process stack, illustration panels | `matchMedia(MOTION_OK)` — the scene never runs, so nothing is hidden |
+| Section entrances, hero chips, illustration panels | `matchMedia(MOTION_OK)` — the scene never runs, so nothing is hidden |
+| The Process deck | not gated, because it is not motion. `position: sticky` is layout (§6): a reduced-motion visitor gets the same stack, just without the scroll-linked motion they never had |
 | `TiltCard` | `useMediaQuery(MOTION_REDUCED)` — the card is simply static |
 | FAQ accordion | `duration: 0` — the answer still has to *appear*, it just snaps |
 | Reading-progress bar | drops its `quickTo` glide, tracks scroll directly — it is a readout, not decoration |
@@ -417,53 +427,48 @@ effect, not a passive one — `Reveal` renders visible and the hook is what hide
 it, so a passive effect would let the browser paint the whole page and then hide
 it, flashing on every load.
 
-### The Process stack
-
-[`Process.jsx`](src/components/landing/Process.jsx) is the page's one scene that
-is *not* an entrance. Four full-height panels pin to the top of the viewport one
-after another, each next panel rising over the one before it while the covered
-panel shrinks and dims. It is the only scroll-driven set piece on the page, and
-the reason `utils/gsap.js` carries a global config line.
-
-**`pinSpacing: false` is the whole mechanism.** A pin normally adds scroll
-distance equal to its duration, which *pushes* the following content down. With
-`pinSpacing: false` the spacer still holds the card's own height, so the page
-never reflows, but no distance is added — so the next card travels up and
-**over** the pinned one. Because nothing adds height, the section is exactly as
-tall as its panels end to end, and each panel contributes one panel of scroll.
-**The pacing knob is the panel's `min-h` and nothing else.**
-
-| Detail | Why |
-| --- | --- |
-| The pin is on an inner `<div data-step>`, not the `<li>` | GSAP wraps a pinned element in `<div class="pin-spacer">`. Pinning the `<li>` would put a div between `<ol>` and `<li>` — invalid HTML that costs the list its semantics |
-| `endTrigger: next, end: 'top top'` | Bounds each pin to its own neighbour, so no card stays pinned past the card covering it |
-| `zIndex: i + 1` on the `<li>`, not the card | A pinned card is `position: fixed`, which would otherwise paint *above* the in-flow card rising to cover it. Positioning the `<li>` makes it a stacking context, so whole cards sort by index — pinned or not |
-| `transformOrigin: 'top center'` on the shrink | Holds the receding card's top edge under the incoming one. A centred origin lets it drift downwards, revealing the background behind it |
-| `refreshPriority: 1` | Pins move every offset below them, so they must be measured before the triggers `useScrollScenes` creates for the sections underneath |
-| `min-h-[72svh]`, content centred | `svh` does not change when a phone's address bar collapses, so a pinned card does not resize mid-scroll. Centring is also what keeps the sticky navbar from covering text — the bar overlays empty padding |
-| `ScrollTrigger.config({ ignoreMobileResize: true })` in `utils/gsap.js` | The other half of the same problem: it tells ScrollTrigger to ignore viewport-height-only resizes on mobile, which is its documented remedy |
-| The card is `bg-white` — **opaque** | Occlusion *is* the effect. A card can only stack on the one beneath it if it hides it, so opacity here is a functional requirement, not a styling preference. These cards were `bg-white/[0.07] backdrop-blur-sm`; at 7% white with a blur you see straight through to the card underneath, and the section reads as four ghosted panels overlapping rather than as a deck |
-| No border, no shadow, no hover state | The panel edge against the gradient is already the highest-contrast edge on the page, so a shadow adds nothing. A pinned panel that brightens under the pointer is pretending to be clickable when it is not |
-
-**The band behind the stack is flat.** The section used to carry a `bg-grid`
-overlay and a blurred blob over the gradient. With four full-width panels over
-it, the band is mostly a backdrop for the *gaps* between cards, and a busy
-backdrop reads as noise through them — so the decoration was deleted and
-`bg-brand-gradient` alone is left. That also removes the section's only
-`overflow-hidden`, so nothing can clip a pinned card.
-
 > ⚠️ **Never put `transition-all` on a node GSAP transforms.** GSAP writes
 > `transform` inline *every frame*, so a CSS transition covering transform puts
 > its duration of lag behind each frame — the tween looks like it is dragging
 > through treacle. Scene-animated elements carry no transition at all, or a
-> colour-only one if they have a hover state that needs it.
+> colour-only one if they have a hover state that needs it. This applies page-wide
+> — the hero chips, `TiltCard` and the FAQ all animate on hover or on open.
 
-**The grid fallback.** `stacked` is `useMediaQuery(MOTION_OK)` — no width query,
-because a full-height panel is what a phone is shaped for. Reduced motion gets
-the plain `grid gap-6 sm:grid-cols-2 lg:grid-cols-4` layout with connector lines
-and `data-reveal` entrances, and no GSAP runs at all. The two modes are
-structurally different — grid vs `space-y`, connectors, reveal attributes — which
-is why this is a React branch and not a Tailwind class.
+### The Process deck
+
+[`Process.jsx`](src/components/landing/Process.jsx) is the one section on the page
+with no GSAP in it at all. Four compact cards stack as you scroll: each holds at
+the top of the viewport while the next rises over it, leaving the top edge of the
+covered card showing.
+
+**The stack is `position: sticky`, not a pin.** It used to be a ScrollTrigger pin
+with `pinSpacing: false` and a scroll-scrubbed shrink, and it never felt right.
+That is structural rather than a matter of tuning: pinning is scroll *hijacking*,
+so the page stops responding the way the reader's hand expects while a panel is
+held in place, and no easing hides that. `sticky` is the browser's own mechanism
+for the same thing, so scrolling never stops being scrolling. It also survives a
+failed animation load — four plain cards, correctly spaced, in a readable order —
+and behaves identically at every width, which is why the section needs no
+`useMediaQuery` branch, no `useGSAP` scene and no mobile-resize workaround.
+
+| Detail | Why |
+| --- | --- |
+| `top` on the `<li>`, fanned by index | `STICK_TOP` is 96px, which clears the sticky navbar (`h-16` / `lg:h-20`). `STICK_FAN` is 14px, so each card holds a little lower than the one before and 14px of every covered card stays exposed. Without the fan they would all hold at the same spot and read as four cards swapping in place — a slideshow, not a deck |
+| `zIndex: i + 1` on the sticky `<li>` | A sticky element with a z-index is its own stacking context, so whole cards sort against each other by index, and each arriving card paints *over* the ones already held |
+| The exposed strip is card padding | `STICK_FAN` (14px) has to stay well under the card's `py-10` (40px), or the strip would show a sliced line of the `h3` instead of blank panel |
+| `space-y-6` on the `<ol>` | The deck's scroll room. A sticky card holds until its container's bottom edge catches it, so the container has to be as tall as the cards stacked end to end |
+| `min-h-[18rem] sm:min-h-[20rem]`, `max-w-3xl` | These were full-viewport `min-h-[72svh]` panels pinned edge to edge, which cost a screen and a half of scroll each and made four short paragraphs feel long. A bounded column of compact cards brings the whole section to about two screens |
+| `ring-1 ring-secondary-200` on the card | A hairline ring, not a shadow and not a heavy border: the band is a flat light neutral, so without it a white card on it has no edge |
+| Nothing writes `transform` to a sticky `<li>` | The cards carry no `data-reveal`, deliberately. A reveal tween would write `transform: translateY()` to the same node the browser is positioning stickily, and a moving card that is also sticking reads as a glitch rather than an entrance. The section heading still has its entrance; the cards do not |
+
+**The band behind the deck is flat and light.** It used to be the dark
+`bg-brand-gradient` with a `bg-grid` overlay and a blurred blob. Three things
+were wrong with that. A full-width saturated purple band behind white cards
+fought them for attention and read as an interruption rather than as part of the
+page. The grid and blob are mostly visible in the *gaps* between cards, where
+decoration only reads as noise. And on a saturated band the card edge is already
+the loudest thing on screen — which is the only reason the cards needed no ring
+there, and the reason they need one now.
 
 ### Primitives
 
@@ -501,17 +506,20 @@ is why this is a React branch and not a Tailwind class.
 > ⚠️ **A `data-reveal` node owns its own transform too**, for the same reason
 > and with the same silent failure. Anything GSAP reveals writes an inline
 > `transform`, so a CSS hover-transform on *that same element* stops working.
-> Put the hover effect on a child instead. This is why the Process cards lift
-> with a border and background change rather than `hover:-translate-y-1`.
+> `Reveal` is a wrapper, so the fix is usually already in place: put the hover on
+> a child. `Contact.jsx` does exactly this — `<Reveal>` wraps an `<a>` carrying
+> `hover:-translate-y-0.5`, and the two never touch. The failure only appears if
+> you put `data-reveal` on the hoverable node itself.
 
 ### Timing
 
 `200ms` hover/colour · `300ms` transform · `550ms` entrance · `900ms` the hero
 gradient wipe. Nothing longer. Stagger siblings by `0.04s`–`0.09s`.
 
-**Still off the table:** parallax, auto-rotating carousels, scroll-jacking. The
-pinned Process section is a deliberate set piece, not a pattern to copy — it is
-the only place the page takes over scrolling, and it has a full static fallback.
+**Still off the table:** parallax, auto-rotating carousels, scroll-jacking, and
+scroll-scrubbed set pieces generally. The Process deck is the closest thing here,
+and it is `position: sticky` — no scrubbing, no pinned panels, no scene. A
+visitor's scroll always moves the page, which is the property worth protecting.
 
 ---
 
@@ -557,7 +565,7 @@ Non-negotiable, and cheap if done from the start.
 src/
 ├── data/landingContent.js          ← all landing-page copy and content
 ├── utils/gsap.js                   ← the ONLY module that imports from 'gsap'
-├── hooks/useMediaQuery.js          ← layout-by-media-query (drives Process)
+├── hooks/useMediaQuery.js          ← layout-by-media-query (drives TiltCard)
 ├── hooks/useScrollScenes.js        ← scroll entrances for every section
 ├── components/landing/
 │   ├── Primitives.jsx              ← Reveal, Eyebrow, SectionHeading, SmartLink
@@ -567,7 +575,7 @@ src/
 │   ├── Navbar.jsx  Hero.jsx  TrustStrip.jsx
 │   ├── Services.jsx                ← the two services, alternating rows
 │   ├── Courses.jsx                 ← live catalogue from the API
-│   ├── Process.jsx                 ← dark band + the stacking-cards scene
+│   ├── Process.jsx                 ← the stacking deck — CSS sticky, no GSAP
 │   ├── WhyUs.jsx                   ← bento grid
 │   ├── Pricing.jsx  Faq.jsx  Contact.jsx  FinalCta.jsx  Footer.jsx
 ├── pages/landing/LandingPage.jsx   ← composes the sections
@@ -597,15 +605,27 @@ The landing page is deliberately ordered and should stay that way:
 | 2 | TrustStrip | Which industries we work in |
 | 3 | Services | The two things we sell |
 | 4 | Courses | The academy — **live data from the API** |
-| 5 | Process | How an engagement runs (dark band) |
+| 5 | Process | How an engagement runs (the stacking deck) |
 | 6 | WhyUs | Reasons to pick us (bento grid) |
 | 7 | Pricing | The two ways to buy |
 | 8 | FAQ | Objection handling |
 | 9 | Contact | Destination of every "talk to us" CTA |
 | 10 | FinalCta + Footer | Last ask and navigation |
 
-Backgrounds alternate white → `secondary-50` → dark so sections separate without
-borders. Keep that rhythm when inserting a section.
+Backgrounds step between surfaces so sections separate without borders. In page
+order that is: `bg-brand-soft` (Hero), white (TrustStrip, Services),
+`secondary-50` (Courses), `secondary-100` (Process), white (WhyUs),
+`secondary-50` (Pricing), `secondary-50` (FAQ), white (Contact, FinalCta). No two
+adjacent bands repeat except Pricing and FAQ, which are both card-led and carry
+their own borders, so the shared tone reads as one longer stretch rather than as
+a missing step.
+
+**There is no full-width dark band anywhere on the page.** The only dark surface
+is the rounded `bg-brand-gradient` panel inside `FinalCta`, and it reads as a
+card precisely because everything around it is light. Keep that: a saturated
+full-width band mid-page fights the white cards on it for attention and reads as
+an interruption. That is exactly what the Process section used to be, and why its
+band is now `secondary-100` (§6).
 
 ---
 
@@ -633,9 +653,11 @@ Flagged honestly rather than hidden.
 
 **Must fix before launch**
 
-- **Contact details are placeholders.** `contact` in `landingContent.js` has
-  `hello@tucacademy.com` and `+234 000 000 0000`. Replace with real details —
-  every "Get a free audit" CTA on the page routes here.
+- **Confirm the contact details.** `contact` in `landingContent.js` carries the
+  real phone — `+234 902 537 9100`, spaces and all, because `Contact.jsx` strips
+  them for the `tel:` href rather than storing a second, unformatted copy. Verify
+  `hello@tucacademy.com`, `Lagos, Nigeria` and the `Mon–Fri, 9am–5pm WAT` hours
+  are current: every "Get a free audit" CTA on the page routes here.
 - **No privacy/terms pages.** The footer's legal links were removed rather than
   left pointing at `#`. Add real pages and restore them.
 
@@ -644,7 +666,8 @@ Flagged honestly rather than hidden.
 - **Add real social proof once you have it.** The page currently has no
   testimonials or statistics at all, which is honest but leaves conversion on
   the table. Even three real client quotes, or your first verified set of
-  campaign results, would strengthen the Process band (§10) and the hero.
+  campaign results, would strengthen the Process deck (§6, whose steps are the
+  most abstract thing on the page) and the hero.
 - **Courses need the API running.** `Courses.jsx` reads `GET /courses` and
   `GET /courses/categories` (both public via `optionalAuth`). With the server
   down it shows the "New courses are being published" placeholder — correct
@@ -653,35 +676,50 @@ Flagged honestly rather than hidden.
   `utils/formatters.js → formatPrice` (which returns `$`) so it matches the
   dashboard. If you sell in Naira, change `formatPrice` once — both surfaces
   will follow.
-- **Bundle size — re-measure.** Route-level code splitting is now in place
-  (§9): every route except the landing page is `React.lazy`, so `recharts` and
-  `react-player` no longer download for a marketing visitor. Before the split
-  the single chunk was 1,407.07 kB / **397.16 kB gzipped**. Since then GSAP was
-  added (~45 kB gzipped) and `framer-motion` was removed entirely (~34 kB
-  gzipped, and it was only serving `TiltCard`, the FAQ accordion, the hero chips
-  and the progress bar). The two roughly cancel. The illustration SVGs were then
-  swapped for DOM panels, which is close to a wash — more markup per panel, but
-  no SVG gradients or clip paths. **Run `npm install && npm run build` and put
-  the real figure here** — it has not been measured since the change, and this
-  line is the only record of it.
+- **Bundle size — measured, but tied to a commit.** Route-level code splitting is
+  in place (§9): every route except the landing page is `React.lazy`, so
+  `recharts` and `react-player` no longer download for a marketing visitor.
+  Before the split the single chunk was 1,407.07 kB / **397.16 kB gzipped**. Since
+  then GSAP was added (~45 kB gzipped) and `framer-motion` was removed entirely
+  (~34 kB gzipped, and it was only serving `TiltCard`, the FAQ accordion, the hero
+  chips and the progress bar), the illustration SVGs became DOM panels, and the
+  Process scene lost its ScrollTrigger. The measured landing chunk is now
+  **643.85 kB / 209.64 kB gzipped**, and Vite warns it exceeds its 500 kB
+  threshold. (Build wall-time is not worth recording — it moved between 14s and
+  15s across two runs of identical code.)
+
+  That is 643.85 kB *raw* against a 1,407.07 kB baseline that was also raw, but
+  the two are not comparable — the baseline predates the route split, so it is
+  the sum of every route, while this figure is the landing entry plus its
+  dependencies. The threshold warning is expected and not worth chasing: the
+  landing page is the one route every visitor loads, and the number moves
+  whenever a landing section changes. Re-measure after each such change rather
+  than treating the figure as fixed.
 
 **Known limitations**
 
-- **The animation layer has never been build-verified.** GSAP, `useScrollScenes`,
-  `TiltCard`, the FAQ rewrite, the progress bar, the Process stack and the
-  illustration panels were all written while the toolchain was unusable, so
-  `npm run build` and `npm run lint` have not run against them. The
-  scroll-entrance system did ship one real bug that only a browser would have
-  caught — see the `WeakSet` note in `useScrollScenes.js` — which is the argument
-  for scrolling the whole page once before trusting any of it.
+- **The animation layer is build-verified, not browser-verified.** `npm run build`
+  passes and a scoped `npx eslint` over the changed landing files is clean. A
+  whole-project `npm run lint` reports **89 problems (83 errors, 6 warnings)**,
+  none of them in the landing components — they are mostly
+  `react-refresh/only-export-components` in `routes/`, `no-unused-vars` in
+  `services/auth.service.js` and `store/authStore.js`, and `no-useless-catch` /
+  `no-useless-escape` in `utils/videoUtils.js`. All pre-existing.
 
-- **The Process stack's pacing is unmeasured.** Pin distances and scroll pacing
-  cannot be checked by reading code. Watch it on a phone as well as a desktop:
-  the panels are `min-h-[72svh]`, so a narrow viewport with a long step body is
-  the case most likely to make a pinned panel taller than the screen — and a
-  pinned panel taller than the viewport is clipped with no way to scroll to its
-  bottom. If that happens, shorten the copy in `process.steps` or lower the
-  `min-h`.
+  A build is not a substitute for looking. The scroll-entrance system shipped one
+  real bug that only a browser would have caught (see the `WeakSet` note in
+  `useScrollScenes.js`), and nothing here has been rendered. Scroll the whole page
+  once before trusting any of it.
+
+- **The Process deck is layout, so it degrades rather than breaks.** There is no
+  ScrollTrigger in `Process.jsx` at all — the stack is `position: sticky` (§6), so
+  there is no pin distance to mis-measure and no scroll pacing to tune. What can
+  still go wrong is the *height* pairing: `STICK_FAN` (14px) must stay under the
+  card's `py-10` (40px), and a step body long enough to make a card taller than
+  the viewport would push its content below the fold while the card is stuck. If
+  that happens, shorten `process.steps[].body` or lower `min-h-[18rem]`.
+
+  Neither is checkable by reading. Watch it at phone width with the longest step.
 
 - **No dark mode.** The palette is designed light-first; a dark theme needs its
   own token pass.

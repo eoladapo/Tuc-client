@@ -15,12 +15,13 @@ import { useGSAP } from '@gsap/react';
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 
 /**
- * The Process section pins on phones as well as desktops, and a phone's address
- * bar collapsing is a viewport-height resize that would otherwise make every
- * pinned card jump mid-scroll. ScrollTrigger's documented remedy is to ignore
- * height-only resizes on mobile; width changes and orientation still refresh.
- * The panels also use `svh` units, so their own height does not move when the
- * bar hides — the two fixes cover the same problem from both ends.
+ * No scene on this page pins any more — the Process deck is CSS `position:
+ * sticky` — but a phone's address bar collapsing is still a viewport-height
+ * resize, and ScrollTrigger reads one as a reason to re-measure every trigger on
+ * the page. For a page made of scroll entrances that is pure churn: nothing has
+ * actually moved, and a re-measure mid-scroll is the one way an entrance can
+ * visibly stutter. ScrollTrigger's documented remedy is to ignore height-only
+ * resizes on mobile; width changes and orientation still refresh.
  */
 ScrollTrigger.config({ ignoreMobileResize: true });
 

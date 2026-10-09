@@ -71,12 +71,11 @@ const numberVar = (el, name, fallback) => {
  * Un-claims elements that are gone from the document or no longer marked, and
  * returns how many it released.
  *
- * This exists for `Process`, whose steps carry `data-reveal` only in the grid
- * layout — the attribute is switched off when the section becomes the pinned
- * stack, because there the shrink tween owns those cards. Without this pass the
- * old entrance tweens would survive the switch and could strand a card under the
- * stack at `opacity: 0`, which is precisely the failure the whole system is
- * built to avoid.
+ * `Courses` renders its cards from a refetch, so a batch of them can be replaced
+ * wholesale; anything this hook had claimed that is now detached would otherwise
+ * keep its tween and its ScrollTrigger alive for the life of the page. The
+ * `matches` check covers the other direction — an element still in the document
+ * whose marker has been removed.
  *
  * `clearProps` is what makes it safe: a killed tween leaves behind whatever it
  * last wrote, so without the reset, pruning a never-entered element would hide
@@ -256,11 +255,11 @@ export const useScrollScenes = () => {
         // *after* mount, so a one-shot query on mount would miss them and they
         // would appear with no entrance at all.
         //
-        // `childList` catches those cards arriving. The `attributes` half
-        // catches an element being *re*-marked — `Process` adds and removes
-        // `data-reveal` on its steps as the section switches between the grid
-        // and the pinned stack, and that is an attribute change, not a child
-        // change. `attributeFilter` is applied by
+        // `childList` catches those cards arriving, and the ones leaving when a
+        // batch is replaced. The `attributes` half is cheap insurance for an
+        // element whose marker is added or removed in place — that is an
+        // attribute change, not a child change, and this hook would otherwise
+        // never reconsider it. `attributeFilter` is applied by
         // the browser, so style and class churn elsewhere on the page costs
         // nothing here.
         //
