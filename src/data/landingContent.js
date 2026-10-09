@@ -35,7 +35,7 @@ import {
 
 export const contact = {
   email: 'hello@tucacademy.com',
-  phone: '+234 000 000 0000',
+  phone: '+234 902 537 9100',
   location: 'Lagos, Nigeria',
   hours: 'Mon–Fri, 9am–5pm WAT',
 };

@@ -51,6 +51,25 @@ import { process } from '../../data/landingContent';
  * white cards fought them for attention and made the section feel like an
  * interruption rather than part of the page.
  */
+
+/**
+ * Where the first card sticks, in px from the top of the viewport.
+ *
+ * A pixel value rather than `top-0`, because the navbar is sticky at `z-50` and
+ * the card has to clear it: the bar is `h-16` (64px) and `lg:h-20` (80px), so
+ * 96px sits just under it at both sizes with a little breathing room.
+ */
+const STICK_TOP = 96;
+
+/**
+ * How far below the previous card each one sticks, in px.
+ *
+ * This is the exposed edge of a covered card. It has to stay comfortably under
+ * the card's `py-10` (40px), or the strip would show a sliced line of the `h3`
+ * instead of blank padding.
+ */
+const STICK_FAN = 14;
+
 const Process = () => (
   <section id="process" className="scroll-mt-20 bg-secondary-100 py-20 sm:py-24 lg:py-28">
     <div className="container-page">
@@ -116,23 +135,5 @@ const Process = () => (
     </div>
   </section>
 );
-
-/**
- * Where the first card sticks, in px from the top of the viewport.
- *
- * A pixel value rather than `top-0`, because the navbar is sticky at `z-50` and
- * the card has to clear it: the bar is `h-16` (64px) and `lg:h-20` (80px), so
- * 96px sits just under it at both sizes with a little breathing room.
- */
-const STICK_TOP = 96;
-
-/**
- * How far below the previous card each one sticks, in px.
- *
- * This is the exposed edge of a covered card. It has to stay comfortably under
- * the card's `py-10` (40px), or the strip would show a sliced line of the
- * `h3` instead of blank padding.
- */
-const STICK_FAN = 14;
 
 export default Process;

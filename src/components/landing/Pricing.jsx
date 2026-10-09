@@ -31,13 +31,13 @@ const Pricing = () => (
                       : 'border-secondary-200 bg-white shadow-soft hover:border-primary-200'
                   )}
                 >
-                  {option.featured && (
-                    <div
-                      aria-hidden="true"
-                      className="absolute inset-x-0 -top-px h-1 rounded-t-3xl bg-gradient-to-r from-primary-400 via-primary-600 to-primary-400"
-                    />
-                  )}
-
+                  {/* No accent bar on the featured card. It was an
+                      absolutely-positioned gradient strip at `-top-px`, which
+                      sat a pixel proud of the card — and because `TiltCard`
+                      rotates the card in 3D, that overhang read as a loose line
+                      floating above the corner rather than as part of the card.
+                      The featured option is already carried by its border,
+                      shadow, solid icon chip and filled button. */}
                   <span
                     className={cn(
                       'flex h-12 w-12 items-center justify-center rounded-2xl transition-transform duration-300 group-hover:scale-105',
